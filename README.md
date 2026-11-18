@@ -27,10 +27,7 @@ A Puppet module to manage the configuration of the FreeBSD base system: rc.conf(
 
 It is the FreeBSD counterpart to [puppet-systemd](https://github.com/voxpupuli/puppet-systemd) and covers parts of the base system that the built-in types don't handle. Packages, users, groups and service state are left to the built-in types.
 
-Functionality that is already provided by other modules for FreeBSD is intentionally not covered, for example:
-
-- The pkg(8) configuration and additional package repositories: [puppet/pkgng](https://github.com/voxpupuli/puppet-pkgng)
-- Unattended FreeBSD operating system updates: [fraenki/f_upgrade](https://github.com/fraenki/puppet-f_upgrade)
+Functionality that is already provided by other modules for FreeBSD is intentionally not covered.
 
 The module provides the following resource types and defined types:
 
@@ -50,7 +47,6 @@ The module provides the following resource types and defined types:
 - sysctl.conf(5) and loader.conf(5) are edited by the module itself, sysrc(8) can't handle dotted names
 - `fbsd_sysctl` writes the config file and sets the live value
 - List variables like `kld_list` can be managed per entry
-- Everything can be configured in Hiera
 
 ## Usage
 
@@ -168,7 +164,7 @@ fbsd::kld { 'if_bridge':
 }
 ```
 
-The module is added to `kld_list` in `/etc/rc.conf` with `sysrc kld_list+=if_bridge`, the way the FreeBSD Handbook does it. Other entries of `kld_list` stay in place. It is loaded right away with `kldload -n` unless it is already loaded (`load => false` disables this). The sysctl variables go to `/etc/sysctl.kld.d/if_bridge.conf`, which is applied at boot right after the module is loaded, and are also set in the running kernel. `/etc/sysctl.conf` may be processed before the module is loaded (see BUGS in sysctl.conf(5)).
+The module is added to `kld_list` in `/etc/rc.conf` with `sysrc kld_list+=if_bridge`, other entries stay in place. It is loaded right away with `kldload -n` unless it is already loaded (`load => false` disables this). The sysctl variables go to `/etc/sysctl.kld.d/if_bridge.conf`, which is applied at boot right after the module is loaded, and are also set in the running kernel. `/etc/sysctl.conf` may be processed before the module is loaded (see BUGS in sysctl.conf(5)).
 
 With `ensure => absent`, the module is removed from `kld_list` (`sysrc kld_list-=if_bridge`) and the variables are removed. The module is not unloaded.
 

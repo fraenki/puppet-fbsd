@@ -8,6 +8,7 @@
 1. [Usage](#usage)
     - [Basic usage](#basic-usage)
     - [Managing rc.conf variables](#managing-rcconf-variables)
+    - [Managing network configuration](#managing-network-configuration)
     - [Configuring services](#configuring-services)
     - [Loading kernel modules](#loading-kernel-modules)
     - [Managing sysctl variables](#managing-sysctl-variables)
@@ -23,7 +24,7 @@
 
 ## Overview
 
-A Puppet module to manage the configuration of the FreeBSD base system: rc.conf(5) variables, service settings in `/etc/rc.conf.d`, kernel modules in `kld_list`, sysctl(8) variables, loader.conf(5) settings and periodic.conf(5) settings.
+A Puppet module to manage the configuration of the FreeBSD base system: rc.conf(5) variables, service settings in `/etc/rc.conf.d`, kernel modules in `kld_list`, sysctl(8) variables, loader.conf(5) settings, periodic.conf(5) settings, network interfaces and static routes.
 
 It is the FreeBSD counterpart to [puppet-systemd](https://github.com/voxpupuli/puppet-systemd) and covers parts of the base system that the built-in types don't handle. Packages, users, groups and service state are left to the built-in types.
 
@@ -39,14 +40,17 @@ The module provides the following resource types and defined types:
 | `fbsd::service` | The variables of a service in `/etc/rc.conf.d/<service>`, including its enable variable |
 | `fbsd::kld` | A kernel module in `kld_list`, its module-specific sysctl(8) variables, and loading it immediately |
 | `fbsd::loader_conf` | A drop-in file in `/boot/loader.conf.d` |
+| `fbsd::interface` | A network interface via `ifconfig_<interface>`, its aliases and IPv6 autoconfiguration |
+| `fbsd::lagg` | A link aggregation via `cloned_interfaces` and `ifconfig_<lagg>` |
+| `fbsd::vlan` | A VLAN interface via `cloned_interfaces`, `create_args_<vlan>` and `ifconfig_<vlan>` |
+| `fbsd::bridge` | A bridge via `cloned_interfaces` and `ifconfig_<bridge>` |
+| `fbsd::route` | A static route via `static_routes`/`ipv6_static_routes` and `route_<name>` |
 
 ## Design
 
 - One resource per variable, no templates. Entries written by bsdinstall(8), `sysrc` or other modules stay in place
 - rc.conf(5) style files are edited with sysrc(8), which updates assignments in place and checks the syntax before writing
 - sysctl.conf(5) and loader.conf(5) are edited by the module itself, sysrc(8) can't handle dotted names
-- `fbsd_sysctl` writes the config file and sets the live value
-- List variables like `kld_list` can be managed per entry
 
 ## Usage
 
@@ -58,7 +62,7 @@ The `fbsd` class does nothing until resources are added to its parameters:
 include fbsd
 ```
 
-All parameters can be set in Hiera. Variables that only need a value can be written as `title: value`, all other attributes are passed as a hash. The following example configures a host that acts as a bridge and synchronizes its time with ntpd:
+All parameters can be set in Hiera. Variables that only need a value can be written as `title: value`, all other attributes are passed as a hash. Hiera data for a bridge host that synchronizes its time with ntpd:
 
 ```yaml
 fbsd::klds:
@@ -105,7 +109,7 @@ class { 'fbsd':
 }
 ```
 
-`fbsd_sysrc` uses sysrc(8) to read (`-F`, `-n`), set (`name=value`) and remove (`-x`) a variable. Unlike a `file` resource it leaves the rest of `/etc/rc.conf` alone, including `hostname` and `ifconfig_*` from bsdinstall(8).
+`fbsd_sysrc` uses sysrc(8) to read (`-F`, `-n`), set (`name=value`) and remove (`-x`) a variable.
 
 The title has the form `name` or `name@target`. Without a target, the variable is managed in `/etc/rc.conf`. Use a target for host-specific values in `/etc/rc.conf.local` or for other files with the same syntax:
 
@@ -119,7 +123,7 @@ class { 'fbsd':
 
 `true` and `false` are converted to `YES` and `NO`.
 
-With `+item` in the title, a single entry of a list variable is managed instead of the whole value. It is added with `sysrc name+=item` and removed with `sysrc name-=item`, other entries stay in place:
+With `+item` in the title, a single entry of a list variable is managed instead of the whole value. It is added with `sysrc name+=item` and removed with `sysrc name-=item`:
 
 ```puppet
 class { 'fbsd':
@@ -128,6 +132,40 @@ class { 'fbsd':
   },
 }
 ```
+
+### Managing network configuration
+
+Interfaces, link aggregations, VLANs, bridges and static routes can be managed via the `interfaces`, `laggs`, `vlans`, `bridges` and `routes` parameters or directly via the matching defined types:
+
+```puppet
+fbsd::lagg { 'lagg0':
+  members => ['em0', 'em1'],
+}
+
+fbsd::vlan { 'vlan10':
+  vlan_id   => 10,
+  vlandev   => 'lagg0',
+  ipaddress => '192.0.2.10',
+  netmask   => 24,
+}
+
+fbsd::route { 'to_dmz':
+  network => '198.51.100.0/24',
+  gateway => '192.0.2.1',
+}
+
+class { 'fbsd':
+  defaultrouter => '192.0.2.1',
+}
+```
+
+This sets `cloned_interfaces` to `lagg0 vlan10`, `ifconfig_lagg0="laggproto failover laggport em0 laggport em1 up"` with `ifconfig_em0="up"` and `ifconfig_em1="up"`, `create_args_vlan10="vlan 10 vlandev lagg0"` with `ifconfig_vlan10="inet 192.0.2.10/24 up"`, and the route in `static_routes`/`route_to_dmz`.
+
+The VLAN tag and parent go to `create_args_<vlan>`, the address to `ifconfig_<vlan>`. When the `fbsd` class is declared, `cloned_interfaces` is ordered so that a lagg is created before a VLAN on it and a VLAN before a bridge that uses it.
+
+Addresses use slash notation for both `inet` and `inet6`. `fbsd::interface` also takes `method => 'dhcp'`, `mtu`, `options`, `onboot => false` (`NOAUTO`), `aliases` and `ipv6_auto` for `inet6 accept_rtadv`. Interface names are translated for the variable name, where `.`, `-`, `/` and `+` become `_` (`em0.102` becomes `ifconfig_em0_102`), while `vlandev`, `laggport`, `addm` and `cloned_interfaces` keep the real name.
+
+Changes are applied right away with `service netif restart <interface>` for each changed interface, followed by a single `service routing restart`. A VLAN or bridge is restarted as well when Puppet restarts the lagg, VLAN or bridge it is attached to. Interfaces with `onboot => false` are not restarted. With `ensure => absent`, the interface is stopped before its variables are removed. Restarting the interface that carries the connection to the Puppet server interrupts the connection until the interface is up again. To only write the variables, set `apply => false` on the defined types and `apply_routing => false` on the `fbsd` class.
 
 ### Configuring services
 
@@ -164,7 +202,7 @@ fbsd::kld { 'if_bridge':
 }
 ```
 
-The module is added to `kld_list` in `/etc/rc.conf` with `sysrc kld_list+=if_bridge`, other entries stay in place. It is loaded right away with `kldload -n` unless it is already loaded (`load => false` disables this). The sysctl variables go to `/etc/sysctl.kld.d/if_bridge.conf`, which is applied at boot right after the module is loaded, and are also set in the running kernel. `/etc/sysctl.conf` may be processed before the module is loaded (see BUGS in sysctl.conf(5)).
+The module is added to `kld_list` in `/etc/rc.conf` with `sysrc kld_list+=if_bridge`. It is loaded right away with `kldload -n` unless it is already loaded (`load => false` disables this). The sysctl variables go to `/etc/sysctl.kld.d/if_bridge.conf`, which is applied at boot right after the module is loaded, and are also set in the running kernel. `/etc/sysctl.conf` may be processed before the module is loaded (see BUGS in sysctl.conf(5)).
 
 With `ensure => absent`, the module is removed from `kld_list` (`sysrc kld_list-=if_bridge`) and the variables are removed. The module is not unloaded.
 
@@ -181,7 +219,7 @@ class { 'fbsd':
 }
 ```
 
-The live value is checked on every run, manual changes are reverted. Use `/etc/sysctl.conf.local` for host-specific values when `/etc/sysctl.conf` is shared by several hosts.
+The live value is checked on every run, manual changes are reverted.
 
 Some variables cannot be changed at runtime, and some are reported in a different format than they are configured. For such variables, set `apply` to `false` to only manage the file:
 
@@ -206,7 +244,7 @@ fbsd::loader_conf { 'zfs':
 
 This creates `/boot/loader.conf.d/zfs.conf` with `vfs.zfs.arc.max="8G"`. The file is managed completely, settings missing from `settings` are removed.
 
-bsdinstall(8) writes settings like `zfs_load="YES"` to `/boot/loader.conf`. `loader_settings` and `fbsd_loader` change single variables there or in `/boot/loader.conf.local` and leave the rest of the file as it is:
+`loader_settings` and `fbsd_loader` change single variables in `/boot/loader.conf` or `/boot/loader.conf.local`:
 
 ```puppet
 class { 'fbsd':
@@ -239,7 +277,7 @@ class { 'fbsd':
 }
 ```
 
-Without a target in the title, the variable is managed in `/etc/periodic.conf`. periodic(8) also reads `/etc/periodic.conf.local` and `/usr/local/etc/periodic.conf`, which can be used as target, e.g. `daily_output@/etc/periodic.conf.local` for a host-specific value when `/etc/periodic.conf` is shared by several hosts.
+Without a target in the title, the variable is managed in `/etc/periodic.conf`. periodic(8) also reads `/etc/periodic.conf.local` and `/usr/local/etc/periodic.conf`, which can be used as target, e.g. `daily_output@/etc/periodic.conf.local`.
 
 Scripts installed by packages are switched on and off the same way. Custom scripts can be deployed with a `file` resource: periodic(8) runs every executable file in the directory, see periodic(8) for the exit codes. The schedule itself lives in `/etc/crontab` and is out of scope of this module.
 
@@ -266,7 +304,7 @@ The types autorequire a `file` resource for the target file and its directory, e
 
 ### Importing an existing configuration
 
-All types list the variables of the configuration files they manage, useful for turning an existing setup into Puppet code or Hiera data:
+All types list the variables of the configuration files they manage:
 
 ```shell
 puppet resource fbsd_sysrc

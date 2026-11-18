@@ -6,13 +6,24 @@
 
 ### Classes
 
+#### Public Classes
+
 * [`fbsd`](#fbsd): Manage the FreeBSD base system configuration
+
+#### Private Classes
+
+* `fbsd::routing`: Restart the routing service once per run
 
 ### Defined types
 
+* [`fbsd::bridge`](#fbsd--bridge): Manage a FreeBSD bridge interface via rc.conf(5)
+* [`fbsd::interface`](#fbsd--interface): Manage a FreeBSD network interface via rc.conf(5)
 * [`fbsd::kld`](#fbsd--kld): Load a kernel module at boot via kld_list
+* [`fbsd::lagg`](#fbsd--lagg): Manage a FreeBSD link aggregation interface via rc.conf(5)
 * [`fbsd::loader_conf`](#fbsd--loader_conf): Manage a loader.conf(5) drop-in file in /boot/loader.conf.d
+* [`fbsd::route`](#fbsd--route): Manage a FreeBSD static route via rc.conf(5)
 * [`fbsd::service`](#fbsd--service): Manage the rc.conf(5) variables of a service in /etc/rc.conf.d
+* [`fbsd::vlan`](#fbsd--vlan): Manage a FreeBSD VLAN interface via rc.conf(5)
 
 ### Resource types
 
@@ -20,13 +31,19 @@
 * [`fbsd_sysctl`](#fbsd_sysctl): Manages a sysctl(8) variable in sysctl.conf(5) and in the running kernel.
 * [`fbsd_sysrc`](#fbsd_sysrc): Manages a single variable in an rc.conf(5) style file with sysrc(8).
 
+### Functions
+
+#### Private Functions
+
+* `fbsd::interface_tokens`: Build the value of an rc.conf(5) `ifconfig_<interface>` variable
+
 ## Classes
 
 ### <a name="fbsd"></a>`fbsd`
 
 Creates resources for rc.conf(5) and periodic.conf(5) variables, services,
-kernel modules, sysctl(8) variables and loader.conf(5) settings from
-hashes, e.g. from Hiera.
+kernel modules, sysctl(8) variables, loader.conf(5) settings, network
+interfaces and static routes from hashes, e.g. from Hiera.
 
 #### Examples
 
@@ -58,13 +75,60 @@ class { 'fbsd':
 
 The following parameters are available in the `fbsd` class:
 
+* [`apply_routing`](#-fbsd--apply_routing)
+* [`bridges`](#-fbsd--bridges)
+* [`defaultrouter`](#-fbsd--defaultrouter)
+* [`interfaces`](#-fbsd--interfaces)
+* [`ipv6_defaultrouter`](#-fbsd--ipv6_defaultrouter)
 * [`klds`](#-fbsd--klds)
+* [`laggs`](#-fbsd--laggs)
 * [`loader_confs`](#-fbsd--loader_confs)
 * [`loader_settings`](#-fbsd--loader_settings)
 * [`periodic_settings`](#-fbsd--periodic_settings)
 * [`rc_settings`](#-fbsd--rc_settings)
+* [`routes`](#-fbsd--routes)
 * [`services`](#-fbsd--services)
 * [`sysctls`](#-fbsd--sysctls)
+* [`vlans`](#-fbsd--vlans)
+
+##### <a name="-fbsd--apply_routing"></a>`apply_routing`
+
+Data type: `Boolean`
+
+Run `service routing restart` when `defaultrouter` or `ipv6_defaultrouter`
+changes.
+
+Default value: `true`
+
+##### <a name="-fbsd--bridges"></a>`bridges`
+
+Data type: `Hash`
+
+Hash of bridge interfaces. Each key is the bridge interface name, each value
+a hash of parameters for fbsd::bridge.
+
+##### <a name="-fbsd--defaultrouter"></a>`defaultrouter`
+
+Data type: `Optional[String[1]]`
+
+The default IPv4 gateway, set as rc.conf(5) `defaultrouter`.
+
+Default value: `undef`
+
+##### <a name="-fbsd--interfaces"></a>`interfaces`
+
+Data type: `Hash`
+
+Hash of network interfaces. Each key is the interface name, each value a hash
+of parameters for fbsd::interface.
+
+##### <a name="-fbsd--ipv6_defaultrouter"></a>`ipv6_defaultrouter`
+
+Data type: `Optional[String[1]]`
+
+The default IPv6 gateway, set as rc.conf(5) `ipv6_defaultrouter`.
+
+Default value: `undef`
 
 ##### <a name="-fbsd--klds"></a>`klds`
 
@@ -73,6 +137,13 @@ Data type: `Hash`
 Hash of kernel modules to load at boot via `kld_list`.
 Each key is the module name. Each value is a hash of parameters for
 fbsd::kld (`ensure`, `load`, `sysctls`).
+
+##### <a name="-fbsd--laggs"></a>`laggs`
+
+Data type: `Hash`
+
+Hash of link aggregation interfaces. Each key is the lagg interface name,
+each value a hash of parameters for fbsd::lagg.
 
 ##### <a name="-fbsd--loader_confs"></a>`loader_confs`
 
@@ -112,6 +183,13 @@ Each key is a fbsd_sysrc title (`name`, `name@target`, `name+item` or
 hash of fbsd_sysrc attributes (`ensure`, `item`, `name`, `target`,
 `value`).
 
+##### <a name="-fbsd--routes"></a>`routes`
+
+Data type: `Hash`
+
+Hash of static routes. Each key is the route name, each value a hash of
+parameters for fbsd::route.
+
 ##### <a name="-fbsd--services"></a>`services`
 
 Data type: `Hash`
@@ -130,7 +208,271 @@ Each key is a fbsd_sysctl title (`name` or `name@target`). Each value is
 either the value of the variable or a hash of fbsd_sysctl attributes
 (`apply`, `ensure`, `value`, `name`, `target`).
 
+##### <a name="-fbsd--vlans"></a>`vlans`
+
+Data type: `Hash`
+
+Hash of VLAN interfaces. Each key is the VLAN interface name, each value a
+hash of parameters for fbsd::vlan.
+
 ## Defined types
+
+### <a name="fbsd--bridge"></a>`fbsd::bridge`
+
+Adds the bridge to `cloned_interfaces` and writes its `ifconfig_<bridge>`
+with the member interfaces (`addm`) and address.
+
+#### Examples
+
+##### A bridge over two interfaces
+
+```puppet
+fbsd::bridge { 'bridge0':
+  members => ['em0', 'em1'],
+}
+```
+
+#### Parameters
+
+The following parameters are available in the `fbsd::bridge` defined type:
+
+* [`members`](#-fbsd--bridge--members)
+* [`ensure`](#-fbsd--bridge--ensure)
+* [`method`](#-fbsd--bridge--method)
+* [`family`](#-fbsd--bridge--family)
+* [`ipaddress`](#-fbsd--bridge--ipaddress)
+* [`netmask`](#-fbsd--bridge--netmask)
+* [`mtu`](#-fbsd--bridge--mtu)
+* [`options`](#-fbsd--bridge--options)
+* [`onboot`](#-fbsd--bridge--onboot)
+* [`apply`](#-fbsd--bridge--apply)
+* [`target`](#-fbsd--bridge--target)
+
+##### <a name="-fbsd--bridge--members"></a>`members`
+
+Data type: `Array[String[1]]`
+
+The interfaces to add to the bridge.
+
+Default value: `[]`
+
+##### <a name="-fbsd--bridge--ensure"></a>`ensure`
+
+Data type: `Enum['present', 'absent']`
+
+Whether the variables should be present or absent.
+
+Default value: `'present'`
+
+##### <a name="-fbsd--bridge--method"></a>`method`
+
+Data type: `Enum['static', 'dhcp', 'manual']`
+
+`static`, `dhcp` or `manual` addressing.
+
+Default value: `'static'`
+
+##### <a name="-fbsd--bridge--family"></a>`family`
+
+Data type: `Enum['inet', 'inet6']`
+
+Address family for a static address.
+
+Default value: `'inet'`
+
+##### <a name="-fbsd--bridge--ipaddress"></a>`ipaddress`
+
+Data type: `Optional[String[1]]`
+
+The static address, without prefix length.
+
+Default value: `undef`
+
+##### <a name="-fbsd--bridge--netmask"></a>`netmask`
+
+Data type: `Optional[Variant[Integer[0, 128], Pattern[/\A\d+\z/]]]`
+
+The prefix length for the static address.
+
+Default value: `undef`
+
+##### <a name="-fbsd--bridge--mtu"></a>`mtu`
+
+Data type: `Optional[Integer[42, 65536]]`
+
+The interface MTU.
+
+Default value: `undef`
+
+##### <a name="-fbsd--bridge--options"></a>`options`
+
+Data type: `Array[String[1]]`
+
+Extra ifconfig(8) arguments.
+
+Default value: `[]`
+
+##### <a name="-fbsd--bridge--onboot"></a>`onboot`
+
+Data type: `Boolean`
+
+When false, the interface is configured but not started at boot (`NOAUTO`).
+
+Default value: `true`
+
+##### <a name="-fbsd--bridge--apply"></a>`apply`
+
+Data type: `Boolean`
+
+Run `service netif restart <bridge>` and `service routing restart` when a
+variable changes or when Puppet restarts a lagg, VLAN or bridge given in
+`members`. Not done for a bridge with `onboot => false`. With
+`ensure => absent`, the bridge is stopped with `service netif stop` before
+its variables are removed.
+
+Default value: `true`
+
+##### <a name="-fbsd--bridge--target"></a>`target`
+
+Data type: `Stdlib::Absolutepath`
+
+The rc.conf(5) style file that contains the variables.
+
+Default value: `'/etc/rc.conf'`
+
+### <a name="fbsd--interface"></a>`fbsd::interface`
+
+Writes `ifconfig_<interface>`, its aliases and `ifconfig_<interface>_ipv6`.
+The interface name is translated for the variable name: `.-/+` become `_`
+(`em0.102` -> `ifconfig_em0_102`).
+
+#### Examples
+
+##### A static interface
+
+```puppet
+fbsd::interface { 'em0':
+  ipaddress => '192.0.2.10',
+  netmask   => 24,
+}
+```
+
+#### Parameters
+
+The following parameters are available in the `fbsd::interface` defined type:
+
+* [`ensure`](#-fbsd--interface--ensure)
+* [`method`](#-fbsd--interface--method)
+* [`family`](#-fbsd--interface--family)
+* [`ipaddress`](#-fbsd--interface--ipaddress)
+* [`netmask`](#-fbsd--interface--netmask)
+* [`mtu`](#-fbsd--interface--mtu)
+* [`options`](#-fbsd--interface--options)
+* [`onboot`](#-fbsd--interface--onboot)
+* [`apply`](#-fbsd--interface--apply)
+* [`ipv6_auto`](#-fbsd--interface--ipv6_auto)
+* [`aliases`](#-fbsd--interface--aliases)
+* [`target`](#-fbsd--interface--target)
+
+##### <a name="-fbsd--interface--ensure"></a>`ensure`
+
+Data type: `Enum['present', 'absent']`
+
+Whether the variables should be present or absent.
+
+Default value: `'present'`
+
+##### <a name="-fbsd--interface--method"></a>`method`
+
+Data type: `Enum['static', 'dhcp', 'manual']`
+
+`static`, `dhcp` or `manual` addressing.
+
+Default value: `'static'`
+
+##### <a name="-fbsd--interface--family"></a>`family`
+
+Data type: `Enum['inet', 'inet6']`
+
+Address family for a static address.
+
+Default value: `'inet'`
+
+##### <a name="-fbsd--interface--ipaddress"></a>`ipaddress`
+
+Data type: `Optional[String[1]]`
+
+The static address, without prefix length.
+
+Default value: `undef`
+
+##### <a name="-fbsd--interface--netmask"></a>`netmask`
+
+Data type: `Optional[Variant[Integer[0, 128], Pattern[/\A\d+\z/]]]`
+
+The prefix length for the static address.
+
+Default value: `undef`
+
+##### <a name="-fbsd--interface--mtu"></a>`mtu`
+
+Data type: `Optional[Integer[42, 65536]]`
+
+The interface MTU.
+
+Default value: `undef`
+
+##### <a name="-fbsd--interface--options"></a>`options`
+
+Data type: `Array[String[1]]`
+
+Extra ifconfig(8) arguments.
+
+Default value: `[]`
+
+##### <a name="-fbsd--interface--onboot"></a>`onboot`
+
+Data type: `Boolean`
+
+When false, the interface is configured but not started at boot (`NOAUTO`).
+
+Default value: `true`
+
+##### <a name="-fbsd--interface--apply"></a>`apply`
+
+Data type: `Boolean`
+
+Run `service netif restart <interface>` and `service routing restart` when
+a variable changes. Not done for an interface with `onboot => false`. With
+`ensure => absent`, the interface is stopped with `service netif stop`
+before its variables are removed.
+
+Default value: `true`
+
+##### <a name="-fbsd--interface--ipv6_auto"></a>`ipv6_auto`
+
+Data type: `Boolean`
+
+Accept IPv6 router advertisements (SLAAC) via `ifconfig_<interface>_ipv6`.
+
+Default value: `false`
+
+##### <a name="-fbsd--interface--aliases"></a>`aliases`
+
+Data type: `Array[String[1]]`
+
+IP alias entries, each a full ifconfig(8) argument such as
+`inet 192.0.2.5/32`.
+
+Default value: `[]`
+
+##### <a name="-fbsd--interface--target"></a>`target`
+
+Data type: `Stdlib::Absolutepath`
+
+The rc.conf(5) style file that contains the variables.
+
+Default value: `'/etc/rc.conf'`
 
 ### <a name="fbsd--kld"></a>`fbsd::kld`
 
@@ -190,6 +532,137 @@ the running kernel when the module is loaded.
 
 Default value: `{}`
 
+### <a name="fbsd--lagg"></a>`fbsd::lagg`
+
+Adds the lagg to `cloned_interfaces` and writes its `ifconfig_<lagg>`
+(protocol, ports and address) and `ifconfig_<member>="up"` for each member.
+
+#### Examples
+
+##### A failover lagg over two NICs
+
+```puppet
+fbsd::lagg { 'lagg0':
+  members   => ['em0', 'em1'],
+  ipaddress => '192.0.2.10',
+  netmask   => 24,
+}
+```
+
+#### Parameters
+
+The following parameters are available in the `fbsd::lagg` defined type:
+
+* [`members`](#-fbsd--lagg--members)
+* [`ensure`](#-fbsd--lagg--ensure)
+* [`laggproto`](#-fbsd--lagg--laggproto)
+* [`method`](#-fbsd--lagg--method)
+* [`family`](#-fbsd--lagg--family)
+* [`ipaddress`](#-fbsd--lagg--ipaddress)
+* [`netmask`](#-fbsd--lagg--netmask)
+* [`mtu`](#-fbsd--lagg--mtu)
+* [`options`](#-fbsd--lagg--options)
+* [`onboot`](#-fbsd--lagg--onboot)
+* [`apply`](#-fbsd--lagg--apply)
+* [`target`](#-fbsd--lagg--target)
+
+##### <a name="-fbsd--lagg--members"></a>`members`
+
+Data type: `Array[String[1], 1]`
+
+The physical member interfaces.
+
+##### <a name="-fbsd--lagg--ensure"></a>`ensure`
+
+Data type: `Enum['present', 'absent']`
+
+Whether the variables should be present or absent.
+
+Default value: `'present'`
+
+##### <a name="-fbsd--lagg--laggproto"></a>`laggproto`
+
+Data type: `Enum['failover', 'lacp', 'loadbalance', 'roundrobin', 'broadcast', 'none']`
+
+The aggregation protocol.
+
+Default value: `'failover'`
+
+##### <a name="-fbsd--lagg--method"></a>`method`
+
+Data type: `Enum['static', 'dhcp', 'manual']`
+
+`static`, `dhcp` or `manual` addressing.
+
+Default value: `'static'`
+
+##### <a name="-fbsd--lagg--family"></a>`family`
+
+Data type: `Enum['inet', 'inet6']`
+
+Address family for a static address.
+
+Default value: `'inet'`
+
+##### <a name="-fbsd--lagg--ipaddress"></a>`ipaddress`
+
+Data type: `Optional[String[1]]`
+
+The static address, without prefix length.
+
+Default value: `undef`
+
+##### <a name="-fbsd--lagg--netmask"></a>`netmask`
+
+Data type: `Optional[Variant[Integer[0, 128], Pattern[/\A\d+\z/]]]`
+
+The prefix length for the static address.
+
+Default value: `undef`
+
+##### <a name="-fbsd--lagg--mtu"></a>`mtu`
+
+Data type: `Optional[Integer[42, 65536]]`
+
+The interface MTU.
+
+Default value: `undef`
+
+##### <a name="-fbsd--lagg--options"></a>`options`
+
+Data type: `Array[String[1]]`
+
+Extra ifconfig(8) arguments.
+
+Default value: `[]`
+
+##### <a name="-fbsd--lagg--onboot"></a>`onboot`
+
+Data type: `Boolean`
+
+When false, the interface is configured but not started at boot (`NOAUTO`).
+
+Default value: `true`
+
+##### <a name="-fbsd--lagg--apply"></a>`apply`
+
+Data type: `Boolean`
+
+Run `service netif restart <lagg>` and `service routing restart` when a
+variable changes. Not done for a lagg with `onboot => false`. With
+`ensure => absent`, the lagg is stopped with `service netif stop` before
+its variables are removed.
+
+Default value: `true`
+
+##### <a name="-fbsd--lagg--target"></a>`target`
+
+Data type: `Stdlib::Absolutepath`
+
+The rc.conf(5) style file that contains the variables.
+
+Default value: `'/etc/rc.conf'`
+
 ### <a name="fbsd--loader_conf"></a>`fbsd::loader_conf`
 
 Writes the settings to /boot/loader.conf.d/<title>.conf. The file is
@@ -233,6 +706,77 @@ value of the variable. `true` and `false` are converted to `YES` and
 `NO`. The variables are written in sorted order.
 
 Default value: `{}`
+
+### <a name="fbsd--route"></a>`fbsd::route`
+
+Adds the route to `static_routes` (or `ipv6_static_routes`) and writes
+`route_<name>` (or `ipv6_route_<name>`).
+
+#### Examples
+
+##### A static route
+
+```puppet
+fbsd::route { 'to_dmz':
+  network => '198.51.100.0/24',
+  gateway => '192.0.2.1',
+}
+```
+
+#### Parameters
+
+The following parameters are available in the `fbsd::route` defined type:
+
+* [`network`](#-fbsd--route--network)
+* [`gateway`](#-fbsd--route--gateway)
+* [`ensure`](#-fbsd--route--ensure)
+* [`family`](#-fbsd--route--family)
+* [`apply`](#-fbsd--route--apply)
+* [`target`](#-fbsd--route--target)
+
+##### <a name="-fbsd--route--network"></a>`network`
+
+Data type: `String[1]`
+
+The destination network in CIDR notation, e.g. `198.51.100.0/24`.
+
+##### <a name="-fbsd--route--gateway"></a>`gateway`
+
+Data type: `Stdlib::IP::Address`
+
+The gateway address.
+
+##### <a name="-fbsd--route--ensure"></a>`ensure`
+
+Data type: `Enum['present', 'absent']`
+
+Whether the variables should be present or absent.
+
+Default value: `'present'`
+
+##### <a name="-fbsd--route--family"></a>`family`
+
+Data type: `Enum['inet', 'inet6']`
+
+Address family of the route.
+
+Default value: `'inet'`
+
+##### <a name="-fbsd--route--apply"></a>`apply`
+
+Data type: `Boolean`
+
+Run `service routing restart` when a variable changes.
+
+Default value: `true`
+
+##### <a name="-fbsd--route--target"></a>`target`
+
+Data type: `Stdlib::Absolutepath`
+
+The rc.conf(5) style file that contains the variables.
+
+Default value: `'/etc/rc.conf'`
 
 ### <a name="fbsd--service"></a>`fbsd::service`
 
@@ -309,6 +853,146 @@ variable name, each value the value of the variable. `true` and `false`
 are converted to `YES` and `NO`.
 
 Default value: `{}`
+
+### <a name="fbsd--vlan"></a>`fbsd::vlan`
+
+Adds the VLAN to `cloned_interfaces`, sets `create_args_<vlan>` with tag and
+parent and writes the address in `ifconfig_<vlan>`.
+
+#### Examples
+
+##### A VLAN on a lagg
+
+```puppet
+fbsd::vlan { 'vlan10':
+  vlan_id   => 10,
+  vlandev   => 'lagg0',
+  ipaddress => '192.0.2.10',
+  netmask   => 24,
+}
+```
+
+#### Parameters
+
+The following parameters are available in the `fbsd::vlan` defined type:
+
+* [`vlan_id`](#-fbsd--vlan--vlan_id)
+* [`vlandev`](#-fbsd--vlan--vlandev)
+* [`ensure`](#-fbsd--vlan--ensure)
+* [`pcp`](#-fbsd--vlan--pcp)
+* [`method`](#-fbsd--vlan--method)
+* [`family`](#-fbsd--vlan--family)
+* [`ipaddress`](#-fbsd--vlan--ipaddress)
+* [`netmask`](#-fbsd--vlan--netmask)
+* [`mtu`](#-fbsd--vlan--mtu)
+* [`options`](#-fbsd--vlan--options)
+* [`onboot`](#-fbsd--vlan--onboot)
+* [`apply`](#-fbsd--vlan--apply)
+* [`target`](#-fbsd--vlan--target)
+
+##### <a name="-fbsd--vlan--vlan_id"></a>`vlan_id`
+
+Data type: `Integer[1, 4094]`
+
+The 802.1Q VLAN tag.
+
+##### <a name="-fbsd--vlan--vlandev"></a>`vlandev`
+
+Data type: `String[1]`
+
+The parent interface the VLAN is attached to.
+
+##### <a name="-fbsd--vlan--ensure"></a>`ensure`
+
+Data type: `Enum['present', 'absent']`
+
+Whether the variables should be present or absent.
+
+Default value: `'present'`
+
+##### <a name="-fbsd--vlan--pcp"></a>`pcp`
+
+Data type: `Optional[Integer[0, 7]]`
+
+The 802.1p priority code point.
+
+Default value: `undef`
+
+##### <a name="-fbsd--vlan--method"></a>`method`
+
+Data type: `Enum['static', 'dhcp', 'manual']`
+
+`static`, `dhcp` or `manual` addressing.
+
+Default value: `'static'`
+
+##### <a name="-fbsd--vlan--family"></a>`family`
+
+Data type: `Enum['inet', 'inet6']`
+
+Address family for a static address.
+
+Default value: `'inet'`
+
+##### <a name="-fbsd--vlan--ipaddress"></a>`ipaddress`
+
+Data type: `Optional[String[1]]`
+
+The static address, without prefix length.
+
+Default value: `undef`
+
+##### <a name="-fbsd--vlan--netmask"></a>`netmask`
+
+Data type: `Optional[Variant[Integer[0, 128], Pattern[/\A\d+\z/]]]`
+
+The prefix length for the static address.
+
+Default value: `undef`
+
+##### <a name="-fbsd--vlan--mtu"></a>`mtu`
+
+Data type: `Optional[Integer[42, 65536]]`
+
+The interface MTU.
+
+Default value: `undef`
+
+##### <a name="-fbsd--vlan--options"></a>`options`
+
+Data type: `Array[String[1]]`
+
+Extra ifconfig(8) arguments.
+
+Default value: `[]`
+
+##### <a name="-fbsd--vlan--onboot"></a>`onboot`
+
+Data type: `Boolean`
+
+When false, the interface is configured but not started at boot (`NOAUTO`).
+
+Default value: `true`
+
+##### <a name="-fbsd--vlan--apply"></a>`apply`
+
+Data type: `Boolean`
+
+Run `service netif restart <vlan>` and `service routing restart` when a
+variable changes or when Puppet restarts a lagg, VLAN or bridge given as
+`vlandev`. Not done for a VLAN with `onboot => false`. With
+`ensure => absent`, the VLAN is stopped with `service netif stop` before
+its variables are removed.
+
+Default value: `true`
+
+##### <a name="-fbsd--vlan--target"></a>`target`
+
+Data type: `Stdlib::Absolutepath`
+
+The rc.conf(5) style file that contains the variables.
+
+Default value: `'/etc/rc.conf'`
 
 ## Resource types
 

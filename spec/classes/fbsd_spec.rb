@@ -61,6 +61,47 @@ describe 'fbsd' do
         it { is_expected.to contain_fbsd_sysctl('kern.logsigexit').with_value(0) }
         it { is_expected.to contain_fbsd_sysctl('kern.ipc.somaxconn@/etc/sysctl.conf.local').with(value: 1024, apply: false) }
       end
+
+      context 'with network hashes' do
+        let(:params) do
+          {
+            interfaces: { 'em0' => { 'ipaddress' => '192.0.2.10', 'netmask' => 24 } },
+            laggs: { 'lagg0' => { 'members' => ['em2', 'em3'] } },
+            vlans: { 'vlan10' => { 'vlan_id' => 10, 'vlandev' => 'lagg0' } },
+            bridges: { 'bridge0' => { 'members' => ['em4'] } },
+            routes: { 'to_dmz' => { 'network' => '198.51.100.0/24', 'gateway' => '192.0.2.1' } },
+            defaultrouter: '192.0.2.1',
+            ipv6_defaultrouter: '2001:db8::1',
+          }
+        end
+
+        it { is_expected.to compile.with_all_deps }
+        it { is_expected.to contain_fbsd__interface('em0') }
+        it { is_expected.to contain_fbsd__lagg('lagg0') }
+        it { is_expected.to contain_fbsd__vlan('vlan10') }
+        it { is_expected.to contain_fbsd__bridge('bridge0') }
+        it { is_expected.to contain_fbsd__route('to_dmz') }
+        it { is_expected.to contain_fbsd_sysrc('defaultrouter').with_value('192.0.2.1') }
+        it { is_expected.to contain_fbsd_sysrc('ipv6_defaultrouter').with_value('2001:db8::1') }
+
+        it { is_expected.to contain_fbsd__lagg('lagg0').that_comes_before('Fbsd::Vlan[vlan10]') }
+        it { is_expected.to contain_fbsd__vlan('vlan10').that_comes_before('Fbsd::Bridge[bridge0]') }
+
+        it { is_expected.to contain_fbsd_sysrc('defaultrouter').that_notifies('Exec[fbsd routing restart]') }
+        it { is_expected.to contain_fbsd_sysrc('ipv6_defaultrouter').that_notifies('Exec[fbsd routing restart]') }
+        it { is_expected.to contain_exec('fbsd netif restart em0').that_notifies('Exec[fbsd routing restart]') }
+        it { is_expected.to contain_exec('fbsd netif restart lagg0').that_notifies('Exec[fbsd netif restart vlan10]') }
+        it { is_expected.to contain_exec('fbsd netif restart lagg0').that_comes_before('Exec[fbsd routing restart]') }
+        it { is_expected.to contain_exec('fbsd netif restart vlan10').that_comes_before('Exec[fbsd routing restart]') }
+      end
+
+      context 'with apply_routing false' do
+        let(:params) { { apply_routing: false, defaultrouter: '192.0.2.1' } }
+
+        it { is_expected.to compile.with_all_deps }
+        it { is_expected.to contain_fbsd_sysrc('defaultrouter').without_notify }
+        it { is_expected.not_to contain_class('fbsd::routing') }
+      end
     end
   end
 end

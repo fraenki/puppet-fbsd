@@ -1,8 +1,13 @@
 ---
+fbsd::bridges: {}
+fbsd::interfaces: {}
 fbsd::klds: {}
+fbsd::laggs: {}
 fbsd::loader_confs: {}
 fbsd::loader_settings: {}
 fbsd::periodic_settings: {}
 fbsd::rc_settings: {}
+fbsd::routes: {}
 fbsd::services: {}
 fbsd::sysctls: {}
+fbsd::vlans: {}

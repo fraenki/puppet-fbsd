@@ -32,6 +32,7 @@
     "freebsd",
     "kld",
     "loader",
+    "network",
     "rcconf",
     "sysctl",
     "sysrc"

@@ -1,13 +1,35 @@
 # @summary Manage the FreeBSD base system configuration
 #
 # Creates resources for rc.conf(5) and periodic.conf(5) variables, services,
-# kernel modules, sysctl(8) variables and loader.conf(5) settings from
-# hashes, e.g. from Hiera.
+# kernel modules, sysctl(8) variables, loader.conf(5) settings, network
+# interfaces and static routes from hashes, e.g. from Hiera.
+#
+# @param apply_routing
+#   Run `service routing restart` when `defaultrouter` or `ipv6_defaultrouter`
+#   changes.
+#
+# @param bridges
+#   Hash of bridge interfaces. Each key is the bridge interface name, each value
+#   a hash of parameters for fbsd::bridge.
+#
+# @param defaultrouter
+#   The default IPv4 gateway, set as rc.conf(5) `defaultrouter`.
+#
+# @param interfaces
+#   Hash of network interfaces. Each key is the interface name, each value a hash
+#   of parameters for fbsd::interface.
+#
+# @param ipv6_defaultrouter
+#   The default IPv6 gateway, set as rc.conf(5) `ipv6_defaultrouter`.
 #
 # @param klds
 #   Hash of kernel modules to load at boot via `kld_list`.
 #   Each key is the module name. Each value is a hash of parameters for
 #   fbsd::kld (`ensure`, `load`, `sysctls`).
+#
+# @param laggs
+#   Hash of link aggregation interfaces. Each key is the lagg interface name,
+#   each value a hash of parameters for fbsd::lagg.
 #
 # @param loader_confs
 #   Hash of loader.conf(5) drop-in files in /boot/loader.conf.d.
@@ -35,6 +57,10 @@
 #   hash of fbsd_sysrc attributes (`ensure`, `item`, `name`, `target`,
 #   `value`).
 #
+# @param routes
+#   Hash of static routes. Each key is the route name, each value a hash of
+#   parameters for fbsd::route.
+#
 # @param services
 #   Hash of service configurations in /etc/rc.conf.d.
 #   Each key is the name of the rc.d script. Each value is a hash of
@@ -46,6 +72,10 @@
 #   Each key is a fbsd_sysctl title (`name` or `name@target`). Each value is
 #   either the value of the variable or a hash of fbsd_sysctl attributes
 #   (`apply`, `ensure`, `value`, `name`, `target`).
+#
+# @param vlans
+#   Hash of VLAN interfaces. Each key is the VLAN interface name, each value a
+#   hash of parameters for fbsd::vlan.
 #
 # @example Configure a host with Puppet DSL
 #   class { 'fbsd':
@@ -69,13 +99,21 @@
 #   }
 #
 class fbsd (
+  Hash $bridges,
+  Hash $interfaces,
   Hash $klds,
+  Hash $laggs,
   Hash $loader_confs,
   Hash $loader_settings,
   Hash $periodic_settings,
   Hash $rc_settings,
+  Hash $routes,
   Hash $services,
   Hash $sysctls,
+  Hash $vlans,
+  Boolean $apply_routing = true,
+  Optional[String[1]] $defaultrouter = undef,
+  Optional[String[1]] $ipv6_defaultrouter = undef,
 ) {
   $klds.each |String $kld_name, Hash $kld_options| {
     fbsd::kld { $kld_name:
@@ -140,4 +178,58 @@ class fbsd (
       * => $_sysctl_options,
     }
   }
+
+  $interfaces.each |String $if_name, Hash $if_options| {
+    fbsd::interface { $if_name:
+      * => $if_options,
+    }
+  }
+
+  $laggs.each |String $lagg_name, Hash $lagg_options| {
+    fbsd::lagg { $lagg_name:
+      * => $lagg_options,
+    }
+  }
+
+  $vlans.each |String $vlan_name, Hash $vlan_options| {
+    fbsd::vlan { $vlan_name:
+      * => $vlan_options,
+    }
+  }
+
+  $bridges.each |String $bridge_name, Hash $bridge_options| {
+    fbsd::bridge { $bridge_name:
+      * => $bridge_options,
+    }
+  }
+
+  $routes.each |String $route_name, Hash $route_options| {
+    fbsd::route { $route_name:
+      * => $route_options,
+    }
+  }
+
+  if $apply_routing and ($defaultrouter or $ipv6_defaultrouter) {
+    include fbsd::routing
+    $routing_notify = Exec['fbsd routing restart']
+  } else {
+    $routing_notify = undef
+  }
+
+  if $defaultrouter {
+    fbsd_sysrc { 'defaultrouter':
+      value  => $defaultrouter,
+      notify => $routing_notify,
+    }
+  }
+
+  if $ipv6_defaultrouter {
+    fbsd_sysrc { 'ipv6_defaultrouter':
+      value  => $ipv6_defaultrouter,
+      notify => $routing_notify,
+    }
+  }
+
+  # cloned_interfaces lists parents before dependents: lagg -> vlan -> bridge.
+  Fbsd::Lagg <| |> -> Fbsd::Vlan <| |> -> Fbsd::Bridge <| |>
 }

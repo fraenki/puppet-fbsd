@@ -1,0 +1,8 @@
+---
+fbsd::klds: {}
+fbsd::loader_confs: {}
+fbsd::loader_settings: {}
+fbsd::periodic_settings: {}
+fbsd::rc_settings: {}
+fbsd::services: {}
+fbsd::sysctls: {}

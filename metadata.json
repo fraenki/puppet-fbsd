@@ -1,0 +1,42 @@
+{
+  "name": "fraenki-fbsd",
+  "version": "1.0.0",
+  "author": "Frank Wall",
+  "summary": "Manage FreeBSD rc.conf, sysctl, kernel module and loader configuration",
+  "license": "BSD-2-Clause",
+  "source": "https://github.com/fraenki/puppet-fbsd",
+  "project_page": "https://github.com/fraenki/puppet-fbsd",
+  "issues_url": "https://github.com/fraenki/puppet-fbsd/issues",
+  "dependencies": [
+    {
+      "name": "puppetlabs-stdlib",
+      "version_requirement": ">= 9.0.0 < 10.0.0"
+    }
+  ],
+  "operatingsystem_support": [
+    {
+      "operatingsystem": "FreeBSD",
+      "operatingsystemrelease": [
+        "14",
+        "15"
+      ]
+    }
+  ],
+  "requirements": [
+    {
+      "name": "puppet",
+      "version_requirement": ">= 8.0 < 10.0.0"
+    }
+  ],
+  "tags": [
+    "freebsd",
+    "kld",
+    "loader",
+    "rcconf",
+    "sysctl",
+    "sysrc"
+  ],
+  "pdk-version": "3.4.0",
+  "template-url": "https://github.com/puppetlabs/pdk-templates.git#3.6.1",
+  "template-ref": "tags/3.6.1-0-gb9426e5"
+}

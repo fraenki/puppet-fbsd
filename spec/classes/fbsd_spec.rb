@@ -78,6 +78,8 @@ describe 'fbsd' do
         it { is_expected.to compile.with_all_deps }
         it { is_expected.to contain_fbsd__interface('em0') }
         it { is_expected.to contain_fbsd__lagg('lagg0') }
+        it { is_expected.to contain_fbsd_sysrc('ifconfig_em2@/etc/rc.conf').with_value('up').that_notifies('Exec[fbsd netif restart lagg0]') }
+        it { is_expected.to contain_fbsd_sysrc('ifconfig_em3@/etc/rc.conf').with_value('up').that_notifies('Exec[fbsd netif restart lagg0]') }
         it { is_expected.to contain_fbsd__vlan('vlan10') }
         it { is_expected.to contain_fbsd__bridge('bridge0') }
         it { is_expected.to contain_fbsd__route('to_dmz') }

@@ -62,6 +62,7 @@ describe 'fbsd::interface' do
         let(:params) { { ipaddress: '192.0.2.10', netmask: 24 } }
 
         it { is_expected.to contain_fbsd_sysrc('ifconfig_em0_102@/etc/rc.conf') }
+        it { is_expected.to contain_exec('fbsd netif restart em0.102').with_command('/usr/sbin/service netif restart em0.102') }
       end
 
       context 'with ensure absent' do

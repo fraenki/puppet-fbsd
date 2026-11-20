@@ -16,6 +16,6 @@ Fixed
 ## 1.0.0 - 2026-11-18
 Initial release.
 
-[Unreleased]: https://github.com/fraenki/puppet-fbsd/compare/1.1.0...HEAD
-[1.1.0]: https://github.com/fraenki/puppet-fbsd/compare/1.0.0...1.1.0
+[Unreleased]: https://github.com/fraenki/puppet-fbsd/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/fraenki/puppet-fbsd/compare/v1.0.0...v1.1.0
 [#1]: https://github.com/fraenki/puppet-fbsd/pull/1

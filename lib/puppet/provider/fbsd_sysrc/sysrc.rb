@@ -62,7 +62,7 @@ Puppet::Type.type(:fbsd_sysrc).provide(:sysrc) do
     return items.include?(resource[:item]) if resource[:item]
     return false unless File.file?(resource[:target])
 
-    self.class.run('-f', resource[:target], '-i', '-F', resource[:name], failonfail: false).to_s.strip == resource[:target]
+    self.class.run('-f', resource[:target], '-i', '-n', '-F', resource[:name], failonfail: false).to_s.strip == resource[:target]
   end
 
   # @return [void]

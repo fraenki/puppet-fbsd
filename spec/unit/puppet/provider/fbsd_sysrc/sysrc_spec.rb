@@ -22,7 +22,7 @@ describe Puppet::Type.type(:fbsd_sysrc).provider(:sysrc) do
     it 'is true if sysrc reports the target file' do
       allow(File).to receive(:file?).with('/etc/rc.conf.d/ntpd').and_return(true)
       allow(described_class).to receive(:execute)
-        .with([sysrc, '-f', '/etc/rc.conf.d/ntpd', '-i', '-F', 'ntpd_flags'], failonfail: false, combine: false)
+        .with([sysrc, '-f', '/etc/rc.conf.d/ntpd', '-i', '-n', '-F', 'ntpd_flags'], failonfail: false, combine: false)
         .and_return(output("/etc/rc.conf.d/ntpd\n"))
       expect(provider.exists?).to be true
     end
@@ -30,8 +30,16 @@ describe Puppet::Type.type(:fbsd_sysrc).provider(:sysrc) do
     it 'is false if the variable is only set in the defaults' do
       allow(File).to receive(:file?).with('/etc/rc.conf.d/ntpd').and_return(true)
       allow(described_class).to receive(:execute)
-        .with([sysrc, '-f', '/etc/rc.conf.d/ntpd', '-i', '-F', 'ntpd_flags'], failonfail: false, combine: false)
+        .with([sysrc, '-f', '/etc/rc.conf.d/ntpd', '-i', '-n', '-F', 'ntpd_flags'], failonfail: false, combine: false)
         .and_return(output("/etc/defaults/rc.conf\n"))
+      expect(provider.exists?).to be false
+    end
+
+    it 'is false if the variable is not set' do
+      allow(File).to receive(:file?).with('/etc/rc.conf.d/ntpd').and_return(true)
+      allow(described_class).to receive(:execute)
+        .with([sysrc, '-f', '/etc/rc.conf.d/ntpd', '-i', '-n', '-F', 'ntpd_flags'], failonfail: false, combine: false)
+        .and_return(output('', 1))
       expect(provider.exists?).to be false
     end
   end

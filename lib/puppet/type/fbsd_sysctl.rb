@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'puppet/parameter/boolean'
+
 Puppet::Type.newtype(:fbsd_sysctl) do
   desc <<-DOC
     @summary Manages a sysctl(8) variable in sysctl.conf(5) and in the running kernel.

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require 'puppet_x/fbsd'
-require 'puppet_x/fbsd/key_value_file'
+require_relative '../fbsd'
+require_relative 'key_value_file'
 
 # Shared implementation of the providers that manage single keys in
 # `key=value` files. A provider including this module must implement the

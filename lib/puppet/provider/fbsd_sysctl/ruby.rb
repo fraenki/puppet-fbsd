@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require 'puppet_x/fbsd/key_value_provider'
+require_relative '../../../puppet_x/fbsd/key_value_provider'
 
 Puppet::Type.type(:fbsd_sysctl).provide(:ruby) do
   desc 'Manages sysctl.conf(5) variables by editing the target file and sets them in the running kernel with sysctl(8).'

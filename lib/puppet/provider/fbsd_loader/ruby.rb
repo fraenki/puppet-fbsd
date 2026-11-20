@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require 'puppet_x/fbsd/key_value_provider'
+require_relative '../../../puppet_x/fbsd/key_value_provider'
 
 Puppet::Type.type(:fbsd_loader).provide(:ruby) do
   desc 'Manages loader.conf(5) variables by editing the target file.'

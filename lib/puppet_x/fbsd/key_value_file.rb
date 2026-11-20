@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require 'puppet/util'
-require 'puppet_x/fbsd'
+require_relative '../fbsd'
 
 # Reads and updates files with one `key=value` assignment per line, such as
 # sysctl.conf(5) and loader.conf(5). Comments, empty lines and assignments of
